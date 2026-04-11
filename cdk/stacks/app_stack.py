@@ -59,22 +59,30 @@ class AppStack(Stack):
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSSMManagedInstanceCore")
         )
 
-        # User data
-        repo_url = "https://github.com/Mogeskebede/aws-three-tier-app.git"  # change this
+        # User data (corrected)
+        repo_url = "https://github.com/Mogeskebede/aws-three-tier-app.git"
+
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
             "yum update -y",
             "yum install -y python3 git",
             "pip3 install --upgrade pip",
+
+            # Clone repo
             "cd /home/ec2-user",
             f"git clone {repo_url} app",
             "cd app/webapp",
             "pip3 install -r requirements.txt",
-            f"export AWS_REGION={self.region}",
-            f"export UPLOADS_BUCKET={uploads_bucket.bucket_name}",
-            f"export METADATA_TABLE={metadata_table.table_name}",
-            f"export APP_SECRET_ID={app_secret.secret_name}",
-            "uvicorn app:app --host 0.0.0.0 --port 80 &",
+
+            # Persist environment variables
+            f"echo 'AWS_REGION={self.region}' >> /etc/environment",
+            f"echo 'UPLOADS_BUCKET={uploads_bucket.bucket_name}' >> /etc/environment",
+            f"echo 'METADATA_TABLE={metadata_table.table_name}' >> /etc/environment",
+            f"echo 'APP_SECRET_ID={app_secret.secret_name}' >> /etc/environment",
+            "source /etc/environment",
+
+            # Start FastAPI (requires sudo for port 80)
+            "sudo uvicorn app:app --host 0.0.0.0 --port 80 &",
         )
 
         # Launch template
@@ -88,7 +96,7 @@ class AppStack(Stack):
             user_data=user_data,
         )
 
-        # Auto Scaling Group
+        # Auto Scaling Group (with replacing update policy)
         asg = autoscaling.AutoScalingGroup(
             self,
             "AppASG",
@@ -98,6 +106,7 @@ class AppStack(Stack):
             desired_capacity=2,
             max_capacity=4,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            update_policy=autoscaling.UpdatePolicy.replacing_update(),
         )
 
         # ALB
