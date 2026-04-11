@@ -90,7 +90,7 @@ class AppStack(Stack):
             self,
             "AppLaunchTemplate",
             instance_type=ec2.InstanceType("t3.micro"),
-            machine_image=ec2.MachineImage.latest_amazon_linux2(),
+            machine_image=ec2.MachineImage.latest_amazon_linux2023(),
             security_group=ec2_sg,
             role=role,
             user_data=user_data,
