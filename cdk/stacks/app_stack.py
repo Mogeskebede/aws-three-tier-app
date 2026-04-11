@@ -60,7 +60,7 @@ class AppStack(Stack):
         )
 
         # User data
-        repo_url = "https://github.com/<your-account>/three-tier-app.git"  # change this
+        repo_url = "https://github.com/Mogeskebede/aws-three-tier-app.git"  # change this
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
             "yum update -y",
