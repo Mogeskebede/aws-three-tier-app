@@ -39,9 +39,9 @@ jobs:
     - name: Install CDK CLI
       run: npm install -g aws-cdk
 
-    - name: CDK Bootstrap (safe to run every time)
+    - name: CDK Bootstrap
       working-directory: cdk
-      run: cdk bootstrap
+      run: cdk bootstrap aws://277707134010/${{ secrets.AWS_REGION }}
 
     - name: CDK Deploy
       working-directory: cdk
