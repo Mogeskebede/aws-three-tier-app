@@ -1,92 +1,89 @@
-import os
-import uuid
-import datetime
+from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 import boto3
+import uuid
+import os
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+app = FastAPI(
+    title="Three-Tier Demo App",
+    description="Designed and Deployed by Moges K",
+    version="1.0.0"
+)
 
-from auth import require_token
 
-AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-UPLOADS_BUCKET = os.environ.get("UPLOADS_BUCKET")
-METADATA_TABLE = os.environ.get("METADATA_TABLE")
+# Auth (Swagger Authorize button)
 
-session = boto3.Session(region_name=AWS_REGION)
-s3 = session.client("s3")
-dynamodb = session.resource("dynamodb")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+SAMPLE_TOKEN = "sample-token-123"
+
+def verify_token(token: str = Depends(oauth2_scheme)):
+    if token != SAMPLE_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing token",
+        )
+    return token
+
+@app.post("/token")
+def generate_token():
+    return {"access_token": SAMPLE_TOKEN, "token_type": "bearer"}
+
+
+# AWS Setup
+
+AWS_REGION = os.getenv("AWS_REGION")
+UPLOADS_BUCKET = os.getenv("UPLOADS_BUCKET")
+METADATA_TABLE = os.getenv("METADATA_TABLE")
+
+s3 = boto3.client("s3", region_name=AWS_REGION)
+dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 table = dynamodb.Table(METADATA_TABLE)
 
-app = FastAPI()
-templates = Jinja2Templates(directory="templates")
 
+# Upload File → S3 + DynamoDB
+
+@app.post("/upload-file")
+def upload_file(
+    file: UploadFile = File(...),
+    token: str = Depends(verify_token)
+):
+    file_id = str(uuid.uuid4())
+    key = f"uploads/{file_id}-{file.filename}"
+
+    # Upload to S3
+    s3.upload_fileobj(file.file, UPLOADS_BUCKET, key)
+
+    # Store metadata
+    item = {
+        "id": file_id,
+        "filename": file.filename,
+        "s3_key": key,
+    }
+    table.put_item(Item=item)
+
+    return {"message": "File uploaded", "id": file_id, "s3_key": key}
+
+
+# List Items
+
+@app.get("/items")
+def list_items(token: str = Depends(verify_token)):
+    response = table.scan()
+    return response.get("Items", [])
+
+
+# Get Single Item
+
+@app.get("/items/{item_id}")
+def get_item(item_id: str, token: str = Depends(verify_token)):
+    response = table.get_item(Key={"id": item_id})
+    if "Item" not in response:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return response["Item"]
+
+
+# Health Check
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-
-@app.get("/", response_class=HTMLResponse)
-def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
-
-
-@app.post("/login")
-def login(request: Request, token: str = Form(...)):
-    # Simple login: token must match bearer token
-    from auth import BEARER_TOKEN
-
-    if token != BEARER_TOKEN:
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Invalid token"},
-        )
-    response = RedirectResponse(url="/upload", status_code=302)
-    response.set_cookie("auth_token", token, httponly=True)
-    return response
-
-
-@app.get("/upload", response_class=HTMLResponse)
-def upload_page(request: Request, _=Depends(require_token)):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-@app.post("/upload")
-def upload_file(
-    request: Request,
-    name: str = Form(...),
-    description: str = Form(""),
-    file: UploadFile = File(...),
-    _=Depends(require_token),
-):
-    item_id = str(uuid.uuid4())
-    s3_key = f"uploads/{item_id}/{file.filename}"
-
-    s3.upload_fileobj(file.file, UPLOADS_BUCKET, s3_key)
-
-    table.put_item(
-        Item={
-            "id": item_id,
-            "name": name,
-            "description": description,
-            "filename": file.filename,
-            "s3_key": s3_key,
-            "bucket": UPLOADS_BUCKET,
-            "uploaded_at": datetime.datetime.utcnow().isoformat(),
-        }
-    )
-
-    return RedirectResponse("/items", status_code=302)
-
-
-@app.get("/items", response_class=HTMLResponse)
-def list_items(request: Request, _=Depends(require_token)):
-    resp = table.scan()
-    items = resp.get("Items", [])
-    items.sort(key=lambda x: x.get("uploaded_at", ""), reverse=True)
-
-    return templates.TemplateResponse(
-        "items.html",
-        {"request": request, "items": items},
-    )
