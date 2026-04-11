@@ -59,19 +59,22 @@ class AppStack(Stack):
             iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSSMManagedInstanceCore")
         )
 
-        # User data (corrected)
+        # User data (corrected for Amazon Linux 2023)
         repo_url = "https://github.com/Mogeskebede/aws-three-tier-app.git"
 
         user_data = ec2.UserData.for_linux()
         user_data.add_commands(
-            "yum update -y",
-            "yum install -y python3 git",
-            "pip3 install --upgrade pip",
+            "dnf update -y",
+            "dnf install -y python3 git",          # Use dnf, not yum
+            "dnf install -y python3-pip",          # REQUIRED on AL2023
 
             # Clone repo
             "cd /home/ec2-user",
             f"git clone {repo_url} app",
             "cd app/webapp",
+
+            # Install Python dependencies
+            "pip3 install --upgrade pip",
             "pip3 install -r requirements.txt",
 
             # Persist environment variables
@@ -84,7 +87,6 @@ class AppStack(Stack):
             # Start FastAPI (requires sudo for port 80)
             "sudo uvicorn app:app --host 0.0.0.0 --port 80 &",
         )
-
         # Launch template
         launch_template = ec2.LaunchTemplate(
             self,
