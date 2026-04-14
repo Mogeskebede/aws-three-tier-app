@@ -87,4 +87,5 @@ This project is built for learning, teaching, and demonstrating real AWS cloud a
 
 
 ------------------
-![ThreeTier (2)](https://github.com/user-attachments/assets/ec423659-7164-4001-9306-094cb57cf985)
+![ThreeTier (2)](https://github.com/user-attachments/assets/51dddb65-e312-4fe8-85ed-db17ea56de8d)
+
