@@ -84,3 +84,4 @@ Open it in your browser and log in using the Bearer token stored in Secrets Mana
 
 Designed and Developed by Moges K
 This project is built for learning, teaching, and demonstrating real AWS cloud architecture patterns. It is intentionally structured to be clear, modular, and production‑inspired.
+
