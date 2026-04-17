@@ -41,7 +41,7 @@ jobs:
 
     - name: CDK Bootstrap
       working-directory: cdk
-      run: cdk bootstrap aws://277707134010/${{ secrets.AWS_REGION }}
+      run: cdk bootstrap aws://${{ secrets.AWS_ACCOUNT }}/${{ secrets.AWS_REGION }}
 
     - name: CDK Deploy
       working-directory: cdk

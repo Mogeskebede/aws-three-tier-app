@@ -86,4 +86,7 @@ def get_item(item_id: str, token: str = Depends(verify_token)):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "message": "Hi all Evangadi Team, this FastAPI app is working fine.",
+        "status": "ok"
+    }
